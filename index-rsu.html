@@ -1,0 +1,1445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#ddd9d0">
+    <title>BinMaster SmartBob / RSU: Virtual Remote Start Unit (4–20 mA)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --face-white: #eceae6;
+            --face-red: #c41e1e;
+            --frame-black: #151515;
+            --lcd-bg: #9fb89a;
+            --lcd-fg: #0d0d0d;
+            --lcd-glow: rgba(130, 180, 120, 0.35);
+            --page-bg: linear-gradient(165deg, #ebe8e2 0%, #e0dbd3 45%, #d5cfc5 100%);
+            --text-main: #1c1f26;
+            --text-soft: #4d5260;
+            --surface-doc: #fcfbf9;
+            --surface-doc-edge: #c5bfb4;
+            --surface-doc-shadow: 0 10px 40px rgba(25, 22, 18, 0.07), 0 1px 0 rgba(255, 255, 255, 0.85) inset;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            min-height: 100dvh;
+            font-family: "Source Sans 3", system-ui, sans-serif;
+            background: var(--page-bg);
+            color: var(--text-main);
+            padding: 28px 16px 56px;
+        }
+        .page-header {
+            max-width: 1100px;
+            margin: 0 auto 32px;
+            text-align: center;
+        }
+        .page-header h1 {
+            font-size: 1.55rem;
+            font-weight: 700;
+            margin: 0 0 10px;
+            letter-spacing: -0.02em;
+            color: var(--text-main);
+        }
+        .page-header p {
+            margin: 0;
+            font-size: 0.95rem;
+            line-height: 1.55;
+            color: var(--text-soft);
+            max-width: 52rem;
+            margin-inline: auto;
+        }
+        .page-header strong {
+            color: #a01818;
+        }
+        .sim-panel {
+            max-width: 520px;
+            margin-inline: auto;
+            padding: 28px 26px 32px;
+            background: var(--surface-doc);
+            border: 1px solid var(--surface-doc-edge);
+            border-radius: 16px;
+            box-shadow: var(--surface-doc-shadow);
+        }
+        .consoles-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            max-width: 1100px;
+            margin: 0 auto;
+            justify-items: center;
+        }
+        .sbc-shell {
+            background: var(--frame-black);
+            border-radius: 14px;
+            padding: 18px;
+            box-shadow: 0 24px 48px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+            outline: none;
+            width: 100%;
+            max-width: 460px;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .sbc-shell:focus, .sbc-shell:focus-visible { outline: none; }
+        .sbc-face,
+        .lcd-bezel,
+        .lcd-panel,
+        .btn-row,
+        .loop-row,
+        .warn-text {
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .sbc-face {
+            background: var(--face-white);
+            border-radius: 8px;
+            padding: 26px 22px 22px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.35);
+        }
+        .sbc-model-title {
+            text-align: center;
+            font-size: 1.85rem;
+            font-weight: 800;
+            color: var(--face-red);
+            letter-spacing: 0.03em;
+            margin: 0 0 12px;
+            width: 100%;
+        }
+        .lcd-bezel {
+            border: 3px solid #c41e1e;
+            border-radius: 4px;
+            padding: 14px;
+            background: linear-gradient(145deg, #7a8f74 0%, #5c6b56 100%);
+            margin-bottom: 20px;
+            width: min(calc(20ch + 52px), 100%);
+            margin-inline: auto;
+        }
+        .lcd-panel {
+            font-family: "JetBrains Mono", "Courier New", monospace;
+            font-size: clamp(10px, 2.6vw, 12px);
+            font-variant-numeric: tabular-nums;
+            background: var(--lcd-bg);
+            color: var(--lcd-fg);
+            min-height: calc(4 * 1.38em + 3 * 0.35em);
+            padding: 14px 16px;
+            border-radius: 2px;
+            box-shadow: inset 0 0 24px var(--lcd-glow);
+            overflow: hidden;
+            width: calc(20ch + 32px);
+            max-width: 100%;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 0.38em;
+        }
+        .lcd-line {
+            width: 20ch;
+            max-width: 100%;
+            margin: 0;
+            white-space: pre;
+            line-height: 1.38;
+            min-height: 1.38em;
+        }
+        .lcd-line--center { text-align: center; }
+        .lcd-line--left { text-align: left; }
+        .lcd-panel .blink-cursor::before {
+            content: "";
+            display: inline-block;
+            width: 0.55em;
+            height: 1em;
+            background: var(--lcd-fg);
+            margin-right: 2px;
+            vertical-align: text-bottom;
+            animation: blink 0.85s step-end infinite;
+        }
+        @keyframes blink { 50% { opacity: 0; } }
+        .binmaster-logo {
+            text-align: center;
+            margin: 16px 0 18px;
+            width: 100%;
+        }
+        .binmaster-logo .bin {
+            font-weight: 900;
+            font-size: 1.35rem;
+            color: var(--face-red);
+            letter-spacing: -0.03em;
+        }
+        .binmaster-logo .master {
+            font-weight: 700;
+            font-style: italic;
+            font-size: 1.2rem;
+            color: var(--face-red);
+        }
+        .btn-row {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 18px;
+            width: 100%;
+            max-width: calc(20ch + 52px);
+        }
+        .sbc-btn-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+        .sbc-btn-label {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--face-red);
+        }
+        .sbc-btn {
+            width: 52px;
+            height: 34px;
+            background: linear-gradient(180deg, #2a2a2a 0%, #0f0f0f 100%);
+            border: 2px solid var(--face-red);
+            border-radius: 3px;
+            cursor: pointer;
+            box-shadow: 0 3px 0 #000, inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            transition: transform 0.06s ease;
+        }
+        .sbc-btn:hover { filter: brightness(1.08); }
+        .sbc-btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 1px 0 #000;
+        }
+        .loop-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            padding-top: 4px;
+            border-top: 1px solid rgba(0, 0, 0, 0.08);
+            width: 100%;
+        }
+        .loop-text {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: var(--face-red);
+            letter-spacing: 0.05em;
+        }
+        .loop-led {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #3a1515;
+            border: 1px solid #222;
+        }
+        .loop-led.on {
+            background: #e02020;
+            box-shadow: 0 0 8px #ff3333;
+        }
+        .warn-text {
+            font-size: 0.62rem;
+            color: var(--face-red);
+            text-align: center;
+            margin-top: 8px;
+            max-width: 280px;
+            line-height: 1.35;
+        }
+        details.manual {
+            max-width: 1100px;
+            margin: 36px auto 0;
+            background: var(--surface-doc);
+            border: 1px solid var(--surface-doc-edge);
+            border-radius: 14px;
+            padding: 20px 24px 24px;
+            box-shadow: var(--surface-doc-shadow);
+            color: var(--text-main);
+        }
+        details.manual summary {
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1.08rem;
+            color: var(--text-main);
+        }
+        details.manual section {
+            margin-top: 20px;
+            padding-top: 18px;
+            border-top: 1px solid rgba(0, 0, 0, 0.06);
+        }
+        details.manual h3 {
+            font-size: 0.98rem;
+            margin: 0 0 10px;
+            color: #2a2f38;
+        }
+        details.manual h4 {
+            font-size: 0.88rem;
+            margin: 18px 0 8px;
+            color: #3a4050;
+            font-weight: 700;
+        }
+        details.manual .usage-lead {
+            font-size: 0.93rem;
+            line-height: 1.65;
+            color: var(--text-soft);
+            margin: 0 0 14px;
+        }
+        details.manual .manual-ref {
+            font-size: 0.82rem;
+            color: #6a6578;
+            margin-top: 14px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(0, 0, 0, 0.06);
+        }
+        details.manual .usage-timer-note {
+            margin: 12px 0 0;
+            font-size: 0.88rem;
+            color: var(--text-soft);
+            line-height: 1.55;
+        }
+        details.manual ul {
+            margin: 0;
+            padding-left: 1.2rem;
+            line-height: 1.65;
+            font-size: 0.92rem;
+            color: var(--text-soft);
+        }
+        .kbd {
+            display: inline-block;
+            border: 1px solid #b8b4aa;
+            border-radius: 4px;
+            padding: 1px 7px;
+            font-size: 0.8rem;
+            font-family: "JetBrains Mono", monospace;
+            background: #f3f1ec;
+            color: #1e2230;
+        }
+        details.manual.troubleshooting {
+            margin-top: 22px;
+        }
+        details.manual.troubleshooting h4 {
+            font-size: 0.9rem;
+            margin: 18px 0 8px;
+            color: #2a2f38;
+            font-weight: 700;
+        }
+        details.manual.troubleshooting h4:first-of-type {
+            margin-top: 0;
+        }
+        details.manual.troubleshooting p {
+            margin: 0;
+            font-size: 0.9rem;
+            line-height: 1.65;
+            color: var(--text-soft);
+        }
+        details.manual.troubleshooting ul {
+            margin: 0;
+            padding-left: 1.2rem;
+            line-height: 1.65;
+            font-size: 0.9rem;
+            color: var(--text-soft);
+        }
+        .wiring-section > h3 {
+            margin: 0 0 8px;
+            font-size: 1rem;
+            color: #2a2f38;
+        }
+        .wiring-section .wiring-sub {
+            margin: 0 0 12px;
+            font-size: 0.88rem;
+            color: var(--text-soft);
+            font-weight: 400;
+        }
+        .wiring-figcaption {
+            margin: 14px 0 0;
+            font-size: 0.82rem;
+            color: var(--text-soft);
+            font-style: italic;
+            line-height: 1.5;
+        }
+
+        /* Wiring viewer: isolated zoom (wheel + toolbar), scroll to pan */
+        .wiring-details {
+            margin-top: 22px;
+        }
+        .wiring-viewer {
+            margin-top: 12px;
+            border: 1px solid #c9c3ba;
+            border-radius: 12px;
+            background: #f6f4ef;
+            overflow: hidden;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+        }
+        .wiring-zoom-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px 12px;
+            padding: 10px 12px;
+            background: linear-gradient(180deg, #eae6df 0%, #e2ddd4 100%);
+            border-bottom: 1px solid #c9c3ba;
+            font-size: 0.88rem;
+        }
+        .wiring-zoom-toolbar button {
+            font-family: "Source Sans 3", system-ui, sans-serif;
+            font-size: 0.88rem;
+            font-weight: 600;
+            padding: 6px 14px;
+            border-radius: 8px;
+            border: 1px solid #a09888;
+            background: linear-gradient(180deg, #faf8f4 0%, #ebe6dc 100%);
+            color: #1e2230;
+            cursor: pointer;
+        }
+        .wiring-zoom-toolbar button:hover {
+            background: #fff;
+            border-color: #8a8070;
+        }
+        .wiring-zoom-toolbar button:active {
+            transform: translateY(1px);
+        }
+        .wiring-zoom-toolbar button:focus-visible {
+            outline: 2px solid #c41e1e;
+            outline-offset: 2px;
+        }
+        .wiring-zoom-step {
+            font-size: 1.15rem;
+            line-height: 1;
+            padding: 6px 16px !important;
+            min-width: 44px;
+        }
+        .wiring-zoom-pct {
+            min-width: 3.5rem;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+            font-weight: 700;
+            color: #2a2f38;
+            font-family: "JetBrains Mono", monospace;
+            font-size: 0.85rem;
+        }
+        .wiring-zoom-scroll {
+            overflow: auto;
+            max-height: min(72vh, 920px);
+            padding: 16px;
+            cursor: grab;
+            outline: none;
+            scroll-behavior: smooth;
+            touch-action: pan-x pan-y pinch-zoom;
+            background: #faf9f7;
+        }
+        .wiring-zoom-scroll.is-dragging {
+            cursor: grabbing;
+            scroll-behavior: auto;
+        }
+        .wiring-zoom-scroll:focus-visible {
+            box-shadow: inset 0 0 0 2px rgba(196, 30, 30, 0.35);
+        }
+        .wiring-zoom-scroll img {
+            display: block;
+            width: auto;
+            height: auto;
+            max-width: none;
+            border-radius: 4px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+            image-rendering: auto;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+        .wiring-viewer-hint {
+            margin: 0;
+            padding: 8px 12px 10px;
+            font-size: 0.78rem;
+            color: var(--text-soft);
+            background: #eae6df;
+            border-top: 1px solid #d5cfc4;
+        }
+        .wiring-figure {
+            margin: 0;
+        }
+        .wiring-notes {
+            margin: 22px 0 0;
+            padding-left: 1.25rem;
+            color: var(--text-soft);
+            font-size: 0.9rem;
+            line-height: 1.65;
+        }
+        .wiring-notes li {
+            margin-bottom: 0.65em;
+            padding-left: 0.35rem;
+        }
+        .wiring-notes li::marker {
+            color: #b81818;
+            font-weight: 700;
+        }
+        .wiring-callout {
+            margin-top: 18px;
+            padding: 14px 18px;
+            border-radius: 10px;
+            border: 1px solid #dfc494;
+            background: linear-gradient(180deg, #fdf8ea 0%, #faf4e4 100%);
+            font-size: 0.88rem;
+            line-height: 1.5;
+            color: #5c4820;
+        }
+        .wiring-callout strong {
+            color: #8b6914;
+            letter-spacing: 0.02em;
+        }
+        .wiring-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px 20px;
+            margin-top: 16px;
+            font-size: 0.8rem;
+            color: var(--text-soft);
+        }
+        .wiring-legend span {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .wiring-legend i {
+            width: 22px;
+            height: 4px;
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+        .wl-power { background: linear-gradient(90deg, #c9784a, #e8a060); }
+        .wl-rs485 { background: linear-gradient(90deg, #4a8fd4, #6ab0e8); }
+        .wl-loop { background: linear-gradient(90deg, #5cb87a, #7dd898); }
+        .wl-shield { background: repeating-linear-gradient(90deg, #888 0 4px, transparent 4px 8px); height: 3px; border-radius: 0; }
+    </style>
+</head>
+<body>
+    <header class="page-header">
+        <h1>Virtual BinMaster SmartBob / RSU</h1>
+        <p>
+            Interactive Remote Start unit with <strong>4-20 output</strong> for demonstration.
+        </p>
+    </header>
+
+    <div class="sim-panel">
+    <div class="consoles-grid">
+        <div class="sbc-shell" id="wrap-rsu" tabindex="-1" aria-label="RSU virtual console">
+            <div class="sbc-face">
+                <div class="sbc-model-title">SmartBob / RSU</div>
+                <div class="lcd-bezel"><div class="lcd-panel" id="lcd-rsu" aria-live="polite"></div></div>
+                <div class="binmaster-logo"><span class="bin">BIN</span><span class="master">MASTER</span></div>
+                <div class="btn-row">
+                    <div class="sbc-btn-wrap"><span class="sbc-btn-label">+</span><button type="button" class="sbc-btn" data-key="inc" aria-label="Plus"></button></div>
+                    <div class="sbc-btn-wrap"><span class="sbc-btn-label">−</span><button type="button" class="sbc-btn" data-key="dec" aria-label="Minus"></button></div>
+                    <div class="sbc-btn-wrap"><span class="sbc-btn-label">ENTER</span><button type="button" class="sbc-btn" data-key="enter" aria-label="Enter"></button></div>
+                </div>
+                <div class="loop-row">
+                    <span class="loop-text">LOOP</span>
+                    <span class="loop-led" id="led-loop" aria-hidden="true"></span>
+                    <span class="loop-text">FAULT</span>
+                </div>
+                <p class="warn-text">REFER TO PRODUCT MANUAL FOR FIELD INSTALLATION AND SAFETY.</p>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <details class="manual">
+        <summary>RSU Usage &amp; Steps</summary>
+
+        <p class="usage-lead">
+            The SmartBob <strong>Remote Start Unit (RSU)</strong> is an add-on for the BinMaster SmartBob system. It adds an <strong>external start</strong> input (dry contact),
+            a <strong>4–20&nbsp;mA</strong> analog output for PLCs/DCS, and a <strong>remote display</strong> of level, distance to product, percent full, and bob status.
+            Measurements and settings are kept in <strong>nonvolatile memory</strong> so they survive power loss.
+        </p>
+
+        <section>
+            <h3>Installation &amp; signals (summary)</h3>
+            <ul>
+                <li><strong>Power:</strong> 16&nbsp;VAC (e.g. recommended transformer); follow local codes (manual suggests 14–18&nbsp;AWG for that feed).</li>
+                <li><strong>RS‑485:</strong> Quality shielded twisted pair to the SmartBob remote; polarity must be correct. Only <strong>one</strong> remote; SmartBob address must be <strong>1</strong> (factory default).</li>
+                <li><strong>4–20&nbsp;mA loop:</strong> Max loop resistance <strong>750&nbsp;Ω</strong>. If exceeded (or loop open), the <strong>LOOP FAULT</strong> LED on the faceplate lights and the analog output is invalid.</li>
+                <li><strong>Wiring diagram:</strong> See the <strong>Wiring</strong> section below and full <cite>SMARTBOB RSU Manual</cite> PDF.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h3>Power-up behavior</h3>
+            <ul>
+                <li>If <strong>bin height is still 000.0</strong>, the RSU shows the splash (<strong>BINMASTER Smart Bob / Remote Start Unit / With 4–20&nbsp;mA Output / Press any Key</strong>). Any key goes to the <strong>Main Menu</strong>.</li>
+                <li>If a bin height was <strong>already stored</strong>, the RSU powers up into <strong>Display Mode</strong> (operational screen), ready for external starts or timed measurements.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h3>Main Menu</h3>
+            <ul>
+                <li><span class="kbd">+</span> → <strong>Setup Menu</strong></li>
+                <li><span class="kbd">−</span> → <strong>Test Menu</strong> (4–20&nbsp;mA loop test)</li>
+                <li><span class="kbd">Enter</span> → <strong>Display Mode</strong> (normal operation). Requires a valid bin height; height <strong>0</strong> produces a display error and you must configure height first.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h3>Setup Menu</h3>
+            <ul>
+                <li><span class="kbd">+</span> → <strong>Set Bin Height</strong> (required for correct 4–20&nbsp;mA scaling).</li>
+                <li><span class="kbd">−</span> → <strong>Configuration Menu</strong> (external start, units, interval timer).</li>
+                <li><span class="kbd">Enter</span> → back to <strong>Main Menu</strong>.</li>
+            </ul>
+            <h4>Bin height entry</h4>
+            <ul>
+                <li>Range <strong>0.1</strong> to <strong>199.9</strong> (feet per manual; metric path uses meters when selected).</li>
+                <li><span class="kbd">+</span> / <span class="kbd">−</span> adjust the active digit; <span class="kbd">Enter</span> accepts that digit and advances. After the tenths digit, the RSU asks if the value is correct: <span class="kbd">+</span> confirms, <span class="kbd">−</span> starts over.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h3>Configuration Menu</h3>
+            <ul>
+                <li><span class="kbd">+</span> → <strong>External Start</strong>: <strong>Momentary</strong> (edge: one measurement per closure) vs <strong>Maintained</strong> (level: repeats while closed). Factory default: momentary. <span class="kbd">Enter</span> returns to Setup Menu.</li>
+                <li><span class="kbd">−</span> → <strong>Units</strong>: English (feet) vs Metric (meters). <span class="kbd">Enter</span> → Setup Menu.</li>
+                <li><span class="kbd">Enter</span> → <strong>Interval Timer</strong> menu.</li>
+            </ul>
+            <h4>Interval timer</h4>
+            <ul>
+                <li><span class="kbd">+</span> → set interval (1&nbsp;minute steps up to <strong>24&nbsp;hours</strong>; enter digits with <span class="kbd">+</span>/<span class="kbd">−</span>/<span class="kbd">Enter</span> per manual).</li>
+                <li><span class="kbd">−</span> → <strong>Enable</strong> / <strong>Disable</strong> timer (toggles).</li>
+                <li><span class="kbd">Enter</span> → <strong>Setup Menu</strong>.</li>
+            </ul>
+            <p class="usage-timer-note"><strong>Timer notes (manual):</strong> Each time the timer is enabled and you return to Display Mode, a measurement runs, even if you enabled then disabled the timer before leaving menus. With the timer off, remaining time is remembered and resumes when re-enabled.</p>
+        </section>
+
+        <section>
+            <h3>Test Menu (4–20&nbsp;mA)</h3>
+            <ul>
+                <li>From Main Menu, <span class="kbd">−</span> opens the test menu for loop calibration/checking.</li>
+                <li><span class="kbd">+</span> → force <strong>20&nbsp;mA</strong> · <span class="kbd">−</span> → force <strong>4&nbsp;mA</strong> (per menu labels on the RSU). <span class="kbd">Enter</span> → Main Menu.</li>
+                <li>Optional for troubleshooting; the RSU does not require calibration for rated accuracy.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h3>Display Mode (operation)</h3>
+            <ul>
+                <li>Normal run mode: accepts <strong>external start</strong> and runs <strong>interval</strong> measurements when the timer is enabled.</li>
+                <li>Shows bin %, product height, distance to product, bob line state, and optional countdown when the timer is on.</li>
+                <li><strong>Any key</strong> exits Display Mode back to the Main Menu (manual).</li>
+            </ul>
+        </section>
+
+        <section>
+            <h3>Faults &amp; errors</h3>
+            <ul>
+                <li><strong>LOOP FAULT LED:</strong> Lit if the 4–20&nbsp;mA loop is open or resistance &gt;&nbsp;750&nbsp;Ω; output not valid.</li>
+                <li><strong>Bob / measurement fault:</strong> If SmartBob senses inconsistent drop vs retract (&gt;&nbsp;6&nbsp;in per manual), the RSU can show an error; the loop may go to <strong>20&nbsp;mA</strong> as a fault indication for the PLC.</li>
+            </ul>
+        </section>
+
+        <p class="manual-ref">
+            Condensed from <cite>SMARTBOB Remote Start Unit: Installation and Operating Instructions</cite> (925-0119&nbsp;Rev.&nbsp;2).
+            This page is a trainer; follow field labels and safe practices for installation.
+        </p>
+    </details>
+
+    <details class="manual wiring-details">
+        <summary>Wiring</summary>
+        <section class="wiring-section">
+            <h3>RSU interconnect wiring</h3>
+            <p class="wiring-sub">Figure&nbsp;1: excerpt from SMARTBOB&nbsp;RSU manual (<abbr title="BinMaster">BINMASTER</abbr>): interconnect wiring.</p>
+
+            <div class="wiring-viewer" id="wiringViewer">
+                <div class="wiring-zoom-toolbar" role="toolbar" aria-label="Diagram zoom">
+                    <button type="button" class="wiring-zoom-step" id="wiringZoomOut" title="Zoom out" aria-label="Zoom out">−</button>
+                    <span class="wiring-zoom-pct" id="wiringZoomPct" aria-live="polite">100%</span>
+                    <button type="button" class="wiring-zoom-step" id="wiringZoomIn" title="Zoom in" aria-label="Zoom in">+</button>
+                    <button type="button" id="wiringZoomFit">Fit width</button>
+                    <button type="button" id="wiringZoomNative" title="Full exported pixel width (~300 DPI raster)">Native px</button>
+                </div>
+                <div class="wiring-zoom-scroll" id="wiringZoomScroll" tabindex="0" aria-label="Wiring diagram. Wheel zooms; drag to pan when zoomed.">
+                    <img id="wiringDiagramImg" src="assets/rsu-interconnect-figure1.png" width="2550" height="3300" alt="RSU Interconnect Wiring Diagram: RSU console and SBR/SBRX remote, power transformer 120VAC to 16VAC parallel feeds, shielded RS-485 pair, and 4–20 mA twisted pair to receiver." decoding="async" loading="lazy" draggable="false" />
+                </div>
+                <p class="wiring-viewer-hint"><strong>Zoom:</strong> centers on your cursor (wheel) or the middle of the view (buttons). <strong>Pan:</strong> drag the drawing or use scrollbars. Page scroll does not move while the pointer is over this frame.</p>
+            </div>
+
+            <p class="wiring-figcaption">Raster excerpt (~300&nbsp;DPI); toolbar zoom only affects this diagram.</p>
+
+            <div class="wiring-callout">
+                <strong>!!! IMPORTANT !!!</strong> Do not ground the secondary of the power transformer.
+            </div>
+
+            <div class="wiring-legend" aria-hidden="true">
+                <span><i class="wl-power"></i> 16&nbsp;VAC power</span>
+                <span><i class="wl-rs485"></i> RS‑485 (+ / −)</span>
+                <span><i class="wl-shield"></i> Shield drain</span>
+                <span><i class="wl-loop"></i> 4–20&nbsp;mA (+ / −)</span>
+            </div>
+
+            <ol class="wiring-notes">
+                <li>Locate the power transformer near the SBR/SBRX remote to limit voltage drop.</li>
+                <li>Use at least <strong>14&nbsp;AWG</strong> (or per local code) from the transformer to the SBR/SBRX remote.</li>
+                <li>Use <strong>shielded RS‑485 twisted pair</strong> between RSU and SBR/SBRX; terminate shields at the terminal blocks as shown. Do <strong>not</strong> connect cable shields to earth ground.</li>
+                <li>Set network termination (<strong>NTR</strong>) to <strong>ON</strong> as required for your network layout (shown ON in the reference diagram).</li>
+            </ol>
+        </section>
+    </details>
+
+    <details class="manual troubleshooting">
+        <summary>Troubleshooting</summary>
+
+        <section>
+            <h4>About this webpage</h4>
+            <p>Browser demo only. Not wired to a real RSU or SmartBob.</p>
+        </section>
+
+        <section>
+            <h4>SmartBob not responding / COMM‑style messages</h4>
+            <p>You often won’t see a single short “COMM” flash. The display may step through lines such as <em>remote did not respond</em>, <em>check RS‑485 wiring</em>, or <em>check address</em> (wording varies by firmware). That’s one fault explained in pieces, not three separate failures.</p>
+            <p><strong>If you see that kind of message:</strong></p>
+            <ul>
+                <li>Tighten RS‑485 terminals and check the pair for breaks or damage.</li>
+                <li>Match +/− at the RSU and the SmartBob.</li>
+                <li>Set the remote to address <strong>1</strong> (RSU talks to one SmartBob at factory default).</li>
+                <li>To narrow it down, disconnect RS‑485 at one end, then the other, and see whether the fault follows the cable or a box.</li>
+                <li>Use shielded twisted pair and land shields per the RSU manual wiring drawing.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h4>Bin height zero / can’t use Display Mode</h4>
+            <p><strong>What it means:</strong> No valid bin height is stored.</p>
+            <p><strong>What to do:</strong> Go into Setup and enter a real bin height.</p>
+        </section>
+
+        <section>
+            <h4>LOOP FAULT LED lit</h4>
+            <p><strong>What it means:</strong> The 4–20&nbsp;mA loop is open or loop resistance is above <strong>750&nbsp;Ω</strong>, so the analog output isn’t reliable.</p>
+            <p><strong>What to do:</strong> Repair the loop before trusting the mA signal.</p>
+        </section>
+
+        <section>
+            <h4>Override, filling, or bob stuck</h4>
+            <p><strong>What to do:</strong> Follow your SmartBob manual and your site’s safety rules.</p>
+        </section>
+
+        <section>
+            <h4>Power, blank screen / dead keys</h4>
+            <p><strong>Weak or missing supply:</strong> Expect about <strong>16&nbsp;VAC</strong> at the RSU terminals per installation.</p>
+            <p><strong>What the RSU expects:</strong> RS‑485 to <strong>one</strong> SmartBob remote at binary address <strong>1</strong>, wired per the RSU manual (Figures&nbsp;1–2 for <strong>SBR/SBRX</strong> and <strong>SBRII</strong>).</p>
+            <p><strong>LCD blank with power OK, or keys don’t work:</strong> Likely bad faceplate electronics.</p>
+            <p><strong>Replacing the RSU:</strong> The RSU unit is retired. Call the <strong>BinMaster Sales</strong> team and order a new <strong>C‑100</strong> unit.</p>
+        </section>
+    </details>
+
+    <script>
+(function () {
+    'use strict';
+
+    var KEY_INC = 1;
+    var KEY_DEC = 2;
+    var KEY_ENTER = 3;
+    var MENU_ALIGN = ['center', 'left', 'left', 'left'];
+    var INTRO_ALIGN = ['center', 'center', 'center', 'center'];
+
+    function pad20(s) {
+        s = String(s);
+        if (s.length > 20) return s.slice(0, 20);
+        while (s.length < 20) s += ' ';
+        return s;
+    }
+
+    function fmt2(n) {
+        return (Math.round(n * 100) / 100).toFixed(2);
+    }
+
+    function lcdEscapeText(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function RSUEmulator() {
+        this.lcdEl = document.getElementById('lcd-rsu');
+        this.ledLoop = document.getElementById('led-loop');
+        this.binHeight = 0;
+        this.units = 0;
+        this.strUnits = ' ft';
+        this.fCountsPerUnit = 80;
+        this.extMomentary = true;
+        this.itimerOn = false;
+        this.intervalH = 0;
+        this.intervalM = 30;
+        this.downCount = 0;
+        this.pendingKey = null;
+        this.mode = 'intro';
+    }
+
+    RSUEmulator.prototype.setLoopFault = function (on) {
+        this.ledLoop.classList.toggle('on', !!on);
+    };
+
+    RSUEmulator.prototype.renderLines = function (lines, cursorRow, align) {
+        align = align || MENU_ALIGN;
+        var parts = [];
+        var i;
+        for (i = 0; i < 4; i++) {
+            var a = align[i] === 'center' ? 'center' : 'left';
+            var raw = a === 'center' ? String(lines[i] || '').trim() : pad20(lines[i] || '');
+            var content = lcdEscapeText(raw);
+            if (cursorRow === i + 1) {
+                content = '<span class="blink-cursor"></span>' + content;
+            }
+            parts.push('<div class="lcd-line lcd-line--' + a + '">' + content + '</div>');
+        }
+        this.lcdEl.innerHTML = parts.join('');
+    };
+
+    RSUEmulator.prototype.introSplash = function () {
+        this.mode = 'intro';
+        this.renderLines(
+            [
+                'BINMASTER Smart Bob ',
+                ' Remote Start Unit  ',
+                'With 4-20mA Output  ',
+                '   Press any Key    '
+            ],
+            0,
+            INTRO_ALIGN
+        );
+    };
+
+    RSUEmulator.prototype.mainMenu = function () {
+        this.mode = 'main_menu';
+        this.renderLines(
+            [
+                '      Main Menu',
+                '+ Key = Setup Menu',
+                '- Key = Test Menu',
+                'Enter = Display Mode'
+            ],
+            0,
+            MENU_ALIGN
+        );
+    };
+
+    RSUEmulator.prototype.displayModeError = function (thenCb) {
+        var self = this;
+        self.mode = 'disp_err';
+        self.renderLines(
+            [
+                'Display Mode Error',
+                pad20('Bin Height = ' + fmt2(self.binHeight) + self.strUnits),
+                self.extMomentary ? ' Momentary Contact' : 'Maintained Contact',
+                'Enter = Setup Menu'
+            ],
+            0,
+            MENU_ALIGN
+        );
+        function waitKey(cb) {
+            var iv = setInterval(function () {
+                if (self.pendingKey !== null) {
+                    var k = self.pendingKey;
+                    self.pendingKey = null;
+                    clearInterval(iv);
+                    cb(k);
+                }
+            }, 16);
+        }
+        waitKey(function (k) {
+            if (k === KEY_ENTER) thenCb();
+        });
+    };
+
+    RSUEmulator.prototype.setupMenuLoop = function () {
+        var self = this;
+        self.mode = 'setup_menu';
+        self.renderLines(
+            [
+                '     Setup Menu',
+                '+= Set Bin Height',
+                '-=Configuration Menu',
+                'Enter = Main Menu'
+            ],
+            0,
+            MENU_ALIGN
+        );
+
+        function waitKey(cb) {
+            var iv = setInterval(function () {
+                if (self.pendingKey !== null) {
+                    var kk = self.pendingKey;
+                    self.pendingKey = null;
+                    clearInterval(iv);
+                    cb(kk);
+                }
+            }, 16);
+        }
+
+        waitKey(function setupK(k) {
+            if (k === KEY_INC) {
+                self.setHeightLoop(function () {
+                    self.setupMenuLoop();
+                });
+            } else if (k === KEY_DEC) {
+                self.configMenuLoop(function () {
+                    self.setupMenuLoop();
+                });
+            } else if (k === KEY_ENTER) {
+                self.mainMenu();
+            } else {
+                waitKey(setupK);
+            }
+        });
+    };
+
+    RSUEmulator.prototype.setHeightLoop = function (done) {
+        var self = this;
+        var h = self.binHeight;
+        if (h <= 0) h = 170;
+
+        function waitKey(cb) {
+            var iv = setInterval(function () {
+                if (self.pendingKey !== null) {
+                    var kk = self.pendingKey;
+                    self.pendingKey = null;
+                    clearInterval(iv);
+                    cb(kk);
+                }
+            }, 16);
+        }
+
+        function redrawConfirm() {
+            self.mode = 'set_height';
+            self.renderLines(
+                [
+                    '   Bin Height Menu',
+                    'Enter Bin Height',
+                    pad20('Bin Height=' + fmt2(h) + self.strUnits),
+                    'Correct? (+/-) '
+                ],
+                0,
+                MENU_ALIGN
+            );
+        }
+
+        redrawConfirm();
+        waitKey(function heightK(k) {
+            if (k === KEY_INC) {
+                h = Math.round((h + 0.1) * 10) / 10;
+                if (h > 199.9) h = 0;
+                redrawConfirm();
+                waitKey(heightK);
+            } else if (k === KEY_DEC) {
+                h = Math.round((h - 0.1) * 10) / 10;
+                if (h < 0) h = 199.9;
+                redrawConfirm();
+                waitKey(heightK);
+            } else if (k === KEY_ENTER) {
+                self.binHeight = h;
+                done();
+            } else {
+                waitKey(heightK);
+            }
+        });
+    };
+
+    RSUEmulator.prototype.configMenuLoop = function (after) {
+        var self = this;
+        self.mode = 'config_menu';
+        self.renderLines(
+            [
+                ' Configuration Menu',
+                '+ = External Start',
+                '- = Units Menu',
+                'Enter=Interval Timer'
+            ],
+            0,
+            MENU_ALIGN
+        );
+
+        function waitKey(cb) {
+            var iv = setInterval(function () {
+                if (self.pendingKey !== null) {
+                    var kk = self.pendingKey;
+                    self.pendingKey = null;
+                    clearInterval(iv);
+                    cb(kk);
+                }
+            }, 16);
+        }
+
+        waitKey(function (k) {
+            if (k === KEY_INC) {
+                self.externalStartLoop(function () {
+                    after();
+                });
+            } else if (k === KEY_DEC) {
+                self.unitsMenuLoop(function () {
+                    after();
+                });
+            } else if (k === KEY_ENTER) {
+                self.intervalMenuLoop(function () {
+                    after();
+                });
+            } else {
+                self.configMenuLoop(after);
+            }
+        });
+    };
+
+    RSUEmulator.prototype.unitsMenuLoop = function (after) {
+        var self = this;
+        self.mode = 'units_menu';
+        var cursor = self.units === 0 ? 2 : 3;
+        self.renderLines(
+            [
+                '      Units Menu',
+                ' + = English (Feet)',
+                ' - = Metric (Meters)',
+                ' Enter = Setup Menu '
+            ],
+            cursor,
+            MENU_ALIGN
+        );
+
+        function waitKey(cb) {
+            var iv = setInterval(function () {
+                if (self.pendingKey !== null) {
+                    var kk = self.pendingKey;
+                    self.pendingKey = null;
+                    clearInterval(iv);
+                    cb(kk);
+                }
+            }, 16);
+        }
+
+        function loop() {
+            waitKey(function (k) {
+                if (k === KEY_INC) {
+                    self.units = 0;
+                    self.strUnits = ' ft';
+                    self.fCountsPerUnit = 80;
+                    cursor = 2;
+                    self.renderLines(
+                        ['Units Menu', ' + = English (Feet)', ' - = Metric (Meters)', ' Enter = Setup Menu '],
+                        cursor,
+                        MENU_ALIGN
+                    );
+                    loop();
+                } else if (k === KEY_DEC) {
+                    self.units = 1;
+                    self.strUnits = ' M';
+                    self.fCountsPerUnit = 262.4672;
+                    cursor = 3;
+                    self.renderLines(
+                        ['Units Menu', ' + = English (Feet)', ' - = Metric (Meters)', ' Enter = Setup Menu '],
+                        cursor,
+                        MENU_ALIGN
+                    );
+                    loop();
+                } else if (k === KEY_ENTER) {
+                    after();
+                } else {
+                    loop();
+                }
+            });
+        }
+        loop();
+    };
+
+    RSUEmulator.prototype.externalStartLoop = function (after) {
+        var self = this;
+        self.mode = 'ext_start';
+        var cursor = self.extMomentary ? 2 : 3;
+        self.renderLines(
+            [
+                'External Start Setup',
+                ' += Momentary Input',
+                ' -= Maintained Input',
+                ' Enter = Setup Menu'
+            ],
+            cursor,
+            MENU_ALIGN
+        );
+
+        function waitKey(cb) {
+            var iv = setInterval(function () {
+                if (self.pendingKey !== null) {
+                    var kk = self.pendingKey;
+                    self.pendingKey = null;
+                    clearInterval(iv);
+                    cb(kk);
+                }
+            }, 16);
+        }
+
+        function loop() {
+            waitKey(function (k) {
+                if (k === KEY_INC) {
+                    self.extMomentary = true;
+                    cursor = 2;
+                    self.renderLines(
+                        ['External Start Setup', ' += Momentary Input', ' -= Maintained Input', ' Enter = Setup Menu'],
+                        cursor,
+                        MENU_ALIGN
+                    );
+                    loop();
+                } else if (k === KEY_DEC) {
+                    self.extMomentary = false;
+                    cursor = 3;
+                    self.renderLines(
+                        ['External Start Setup', ' += Momentary Input', ' -= Maintained Input', ' Enter = Setup Menu'],
+                        cursor,
+                        MENU_ALIGN
+                    );
+                    loop();
+                } else if (k === KEY_ENTER) {
+                    after();
+                } else {
+                    loop();
+                }
+            });
+        }
+        loop();
+    };
+
+    RSUEmulator.prototype.intervalMenuLoop = function (after) {
+        var self = this;
+        self.mode = 'interval_menu';
+        var toggleLabel = self.itimerOn ? '- = Disable Timer ' : '- = Enable Timer ';
+        self.renderLines(
+            [
+                'Interval Timer Menu',
+                '+=Set Interval Timer',
+                toggleLabel,
+                ' Enter = Setup Menu'
+            ],
+            0,
+            MENU_ALIGN
+        );
+
+        function waitKey(cb) {
+            var iv = setInterval(function () {
+                if (self.pendingKey !== null) {
+                    var kk = self.pendingKey;
+                    self.pendingKey = null;
+                    clearInterval(iv);
+                    cb(kk);
+                }
+            }, 16);
+        }
+
+        waitKey(function (k) {
+            if (k === KEY_INC) {
+                self.intervalH = (self.intervalH + 1) % 24;
+                self.intervalMenuLoop(after);
+            } else if (k === KEY_DEC) {
+                self.itimerOn = !self.itimerOn;
+                self.intervalMenuLoop(after);
+            } else if (k === KEY_ENTER) {
+                after();
+            } else {
+                self.intervalMenuLoop(after);
+            }
+        });
+    };
+
+    RSUEmulator.prototype.testMenuLoop = function () {
+        var self = this;
+        self.mode = 'test_menu';
+        self.renderLines(
+            [
+                '      Test Menu',
+                ' + Key = 20mA output',
+                ' - Key =  4mA output',
+                ' Enter = Main Menu'
+            ],
+            0,
+            MENU_ALIGN
+        );
+
+        function waitKey(cb) {
+            var iv = setInterval(function () {
+                if (self.pendingKey !== null) {
+                    var kk = self.pendingKey;
+                    self.pendingKey = null;
+                    clearInterval(iv);
+                    cb(kk);
+                }
+            }, 16);
+        }
+
+        waitKey(function testK(k) {
+            if (k === KEY_INC) {
+                self.renderLines(['', '', pad20('>>> 20 mA test <<<'), 'Release key'], 0, MENU_ALIGN);
+                self.setLoopFault(true);
+                waitKey(function () {
+                    self.setLoopFault(false);
+                    self.testMenuLoop();
+                });
+            } else if (k === KEY_DEC) {
+                self.renderLines(['', '', pad20('>>>  4 mA test <<<'), 'Release key'], 0, MENU_ALIGN);
+                waitKey(function () {
+                    self.testMenuLoop();
+                });
+            } else if (k === KEY_ENTER) {
+                self.mainMenu();
+            } else {
+                waitKey(testK);
+            }
+        });
+    };
+
+    RSUEmulator.prototype.convertDisplayLines = function () {
+        var total = this.binHeight * this.fCountsPerUnit;
+        var ratioFull = total > 0 ? (total - this.downCount) / total : 0;
+        var pct = ratioFull * 100;
+        var l1 = pad20('Bin #1  ' + fmt2(pct) + '% full');
+        var prod = ((total - this.downCount) / this.fCountsPerUnit);
+        var head = this.downCount / this.fCountsPerUnit;
+        var l2 = pad20(fmt2(prod) + this.strUnits + ' of product');
+        var l3 = pad20(fmt2(head) + this.strUnits + ' to product');
+        return { l1: l1, l2: l2, l3: l3 };
+    };
+
+    RSUEmulator.prototype.displayModeLoop = function () {
+        var self = this;
+        self.mode = 'display_mode';
+        var total = self.binHeight * self.fCountsPerUnit;
+        self.downCount = Math.floor(total * 0.35);
+        var lines = self.convertDisplayLines();
+        var l4 = self.itimerOn
+            ? pad20(
+                  'Measure in ' +
+                      (self.intervalH < 10 ? '0' : '') +
+                      self.intervalH +
+                      ':' +
+                      (self.intervalM < 10 ? '0' : '') +
+                      self.intervalM +
+                      ':00'
+              )
+            : '  Bob is retracted  ';
+        self.renderLines([lines.l1, lines.l2, lines.l3, l4], 0, MENU_ALIGN);
+
+        function waitKey(cb) {
+            var iv = setInterval(function () {
+                if (self.pendingKey !== null) {
+                    var kk = self.pendingKey;
+                    self.pendingKey = null;
+                    clearInterval(iv);
+                    cb(kk);
+                }
+            }, 16);
+        }
+
+        waitKey(function (k) {
+            if (k === KEY_ENTER) {
+                self.mainMenu();
+            } else {
+                self.displayModeLoop();
+            }
+        });
+    };
+
+    RSUEmulator.prototype.pushKey = function (key) {
+        var self = this;
+
+        if (self.mode === 'intro') {
+            self.mainMenu();
+            return;
+        }
+
+        self.pendingKey = key;
+    };
+
+    var emu = new RSUEmulator();
+    emu.introSplash();
+
+    document.querySelectorAll('.sbc-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.getElementById('wrap-rsu').focus({ preventScroll: true });
+            var k = btn.getAttribute('data-key');
+            var key = k === 'inc' ? KEY_INC : k === 'dec' ? KEY_DEC : KEY_ENTER;
+            routeKey(key);
+        });
+    });
+
+    document.getElementById('wrap-rsu').addEventListener('mousedown', function () {});
+
+    function routeKey(key) {
+        if (emu.mode === 'intro') {
+            emu.pushKey(key);
+            return;
+        }
+        if (emu.mode === 'main_menu') {
+            if (key === KEY_INC) emu.setupMenuLoop();
+            else if (key === KEY_DEC) emu.testMenuLoop();
+            else if (key === KEY_ENTER) {
+                if (emu.binHeight <= 0) {
+                    emu.displayModeError(function () {
+                        emu.setupMenuLoop();
+                    });
+                } else {
+                    emu.displayModeLoop();
+                }
+            }
+            return;
+        }
+        emu.pushKey(key);
+    }
+
+    document.addEventListener('keydown', function (e) {
+        var t = e.target;
+        if (t && t.closest && t.closest('#wiringViewer')) return;
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+        var key = null;
+        if (e.key === '+' || e.key === '=') key = KEY_INC;
+        else if (e.key === '-' || e.key === '_') key = KEY_DEC;
+        else if (e.key === 'Enter') key = KEY_ENTER;
+        if (key == null) return;
+        e.preventDefault();
+        routeKey(key);
+    });
+})();
+    </script>
+    <script>
+(function () {
+    'use strict';
+    var scrollEl = document.getElementById('wiringZoomScroll');
+    var img = document.getElementById('wiringDiagramImg');
+    var pctEl = document.getElementById('wiringZoomPct');
+    var details = document.querySelector('details.wiring-details');
+    var viewer = document.getElementById('wiringViewer');
+    if (!scrollEl || !img || !pctEl || !viewer) return;
+
+    var userZoom = 1;
+
+    function syncFitBase() {
+        var pad = 36;
+        return Math.max(200, scrollEl.clientWidth - pad);
+    }
+
+    function clampScroll() {
+        var vw = scrollEl.clientWidth;
+        var vh = scrollEl.clientHeight;
+        var maxL = Math.max(0, scrollEl.scrollWidth - vw);
+        var maxT = Math.max(0, scrollEl.scrollHeight - vh);
+        scrollEl.scrollLeft = Math.min(Math.max(0, scrollEl.scrollLeft), maxL);
+        scrollEl.scrollTop = Math.min(Math.max(0, scrollEl.scrollTop), maxT);
+    }
+
+    /**
+     * Zoom while keeping the document point under (clientX, clientY) stable.
+     */
+    function setZoomAtViewportPoint(clientX, clientY, nextZoom) {
+        nextZoom = Math.max(0.12, Math.min(8, nextZoom));
+        var rect = scrollEl.getBoundingClientRect();
+        var ax = scrollEl.scrollLeft + (clientX - rect.left);
+        var ay = scrollEl.scrollTop + (clientY - rect.top);
+        var sw = scrollEl.scrollWidth || 1;
+        var sh = scrollEl.scrollHeight || 1;
+        var rx = ax / sw;
+        var ry = ay / sh;
+
+        userZoom = nextZoom;
+        var fitPx = syncFitBase();
+        var w = Math.round(fitPx * userZoom);
+        w = Math.max(120, Math.min(w, (img.naturalWidth || 2550) * 4));
+        img.style.width = w + 'px';
+        userZoom = w / fitPx;
+        pctEl.textContent = Math.round(userZoom * 100) + '%';
+
+        requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+                var nsw = scrollEl.scrollWidth;
+                var nsh = scrollEl.scrollHeight;
+                scrollEl.scrollLeft = rx * nsw - (clientX - rect.left);
+                scrollEl.scrollTop = ry * nsh - (clientY - rect.top);
+                clampScroll();
+            });
+        });
+    }
+
+    function viewportCenterPoint() {
+        var r = scrollEl.getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    }
+
+    function fitWidth() {
+        userZoom = 1;
+        var fitPx = syncFitBase();
+        img.style.width = Math.round(fitPx * userZoom) + 'px';
+        pctEl.textContent = '100%';
+        scrollEl.scrollLeft = 0;
+        scrollEl.scrollTop = 0;
+    }
+
+    function zoomStep(mult) {
+        var p = viewportCenterPoint();
+        setZoomAtViewportPoint(p.x, p.y, userZoom * mult);
+    }
+
+    function nativePixels() {
+        if (!img.naturalWidth) return;
+        var fitPx = syncFitBase();
+        var target = Math.min(img.naturalWidth / fitPx, 8);
+        var p = viewportCenterPoint();
+        setZoomAtViewportPoint(p.x, p.y, target);
+    }
+
+    function onWheel(e) {
+        if (e.target.closest && e.target.closest('.wiring-zoom-toolbar')) return;
+        if (!viewer.contains(e.target)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        var mult = e.deltaY > 0 ? 1 / 1.07 : 1.07;
+        setZoomAtViewportPoint(e.clientX, e.clientY, userZoom * mult);
+    }
+
+    scrollEl.addEventListener('mousedown', function (down) {
+        if (down.button !== 0) return;
+        if (down.target.closest && down.target.closest('a')) return;
+        down.preventDefault();
+        var lastX = down.pageX;
+        var lastY = down.pageY;
+        scrollEl.classList.add('is-dragging');
+        function move(e) {
+            scrollEl.scrollLeft -= e.pageX - lastX;
+            scrollEl.scrollTop -= e.pageY - lastY;
+            lastX = e.pageX;
+            lastY = e.pageY;
+        }
+        function up() {
+            scrollEl.classList.remove('is-dragging');
+            document.removeEventListener('mousemove', move);
+            document.removeEventListener('mouseup', up);
+        }
+        document.addEventListener('mousemove', move);
+        document.addEventListener('mouseup', up);
+    });
+
+    img.addEventListener('load', fitWidth);
+    if (img.complete && img.naturalWidth) fitWidth();
+
+    if (details) {
+        details.addEventListener('toggle', function () {
+            if (details.open) requestAnimationFrame(fitWidth);
+        });
+    }
+
+    document.getElementById('wiringZoomIn').addEventListener('click', function () { zoomStep(1.12); });
+    document.getElementById('wiringZoomOut').addEventListener('click', function () { zoomStep(1 / 1.12); });
+    document.getElementById('wiringZoomFit').addEventListener('click', fitWidth);
+    document.getElementById('wiringZoomNative').addEventListener('click', nativePixels);
+
+    var rzTimer;
+    window.addEventListener('resize', function () {
+        clearTimeout(rzTimer);
+        rzTimer = setTimeout(function () {
+            if (details && details.open) {
+                var p = viewportCenterPoint();
+                setZoomAtViewportPoint(p.x, p.y, userZoom);
+            }
+        }, 100);
+    });
+
+    viewer.addEventListener('wheel', onWheel, { passive: false });
+})();
+    </script>
+</body>
+</html>
